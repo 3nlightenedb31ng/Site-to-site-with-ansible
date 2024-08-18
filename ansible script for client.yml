@@ -1,0 +1,40 @@
+---
+- name: Configure IPsec for site-to-site VPN on rhel-try
+  hosts: rhel-try
+  become: yes
+  tasks:
+    - name: Write IPsec configuration to /etc/strongswan/ipsec.conf
+      ansible.builtin.copy:
+        dest: /etc/strongswan/ipsec.conf
+        content: |
+          config setup
+              charondebug="ike 2, knl 2, cfg 2"
+              uniqueids=never
+
+          conn site-to-site
+              auto=start
+              left=10.0.0.2
+              leftsubnet=192.168.2.0/24
+              right=10.0.0.1
+              rightsubnet=192.168.1.0/24
+              ike=aes256-sha256-modp2048
+              esp=aes256-sha256
+              authby=secret
+              keyingtries=0
+              dpddelay=30
+              dpdtimeout=120
+              dpdaction=restart
+
+    - name: Add PSK entry to /etc/strongswan/ipsec.secrets
+      ansible.builtin.lineinfile:
+        dest: /etc/strongswan/ipsec.secrets
+        line: "10.0.0.2 10.0.0.1 : PSK \"sameervpn123\""
+        create: yes
+        state: present
+
+    - name: Restart StrongSwan service to apply the configuration
+      ansible.builtin.systemd:
+        name: strongswan-starter.service
+        state: restarted
+        enabled: yes
+
